@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2007 Apple Inc. All rights reserved.
+ * Copyright (c) 1998-2008 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -55,6 +55,7 @@
 #define kIOUSBKnownCSWTagIssues                 "Known CSW Tag Issues"
 #define kIOUSBMassStorageMaxLogicalUnitNumber	"Max Logical Unit Number"
 #define kIOPropertyIOUnitKey                    "IOUnit"
+
 
 #pragma mark -
 #pragma mark CBI Protocol Strutures
@@ -444,6 +445,8 @@ protected:
 
     void                ResetDeviceNow( bool waitForReset );
 	void                AbortCurrentSCSITask( void );
+	
+	bool			IsPhysicalInterconnectLocationInternal ( void );
 	 
 	// Space reserved for future expansion.
     OSMetaClassDeclareReservedUnused( IOUSBMassStorageClass, 3 );

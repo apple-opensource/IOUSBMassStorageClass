@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2007 Apple Inc. All rights reserved.
+ * Copyright (c) 1998-2008 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -22,9 +22,9 @@
  */
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 //	Includes
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 // General OS Services header files
 #include <libkern/OSByteOrder.h>
@@ -38,9 +38,29 @@
 #include <IOKit/IODeviceTreeSupport.h>
 #include <IOKit/IOKitKeys.h>
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+
+//--------------------------------------------------------------------------------------------------
+//	Defines
+//--------------------------------------------------------------------------------------------------
+
+// Masks for GetDeviceInformation response. GetDeviceInformation returns a UInt32. 
+enum
+{
+	kUSBDeviceInfoIsCaptiveMask             =  	( 1 << kUSBInformationDeviceIsCaptiveBit ),
+	kUSBDeviceInfoIsAttachedToRootHubMask   =  	( 1 << kUSBInformationDeviceIsAttachedToRootHubBit ),
+	kUSBDeviceInfoIsInternalMask            =  	( 1 << kUSBInformationDeviceIsInternalBit ),
+	kUSBDeviceInfoIsConnectedMask           =  	( 1 << kUSBInformationDeviceIsConnectedBit ),
+	kUSBDeviceInfoIsEnabledMask             =  	( 1 << kUSBInformationDeviceIsEnabledBit ),
+	kUSBDeviceInfoIsSuspendedMask           =  	( 1 << kUSBInformationDeviceIsSuspendedBit ),
+	kUSBDeviceInfoIsInResetMask             =  	( 1 << kUSBInformationDeviceIsInResetBit ),
+	kUSBDeviceInfoOvercurrentMask          	= 	( 1 << kUSBInformationDeviceOvercurrentBit ),
+	kUSBDeviceInfoIsePortIsInTestModeMask   = 	( 1 << kUSBInformationDevicePortIsInTestModeBit )
+};
+
+
+//-----------------------------------------------------------------------------
 //	Macros
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 // Macros for printing debugging information
 #if (USB_MASS_STORAGE_DEBUG == 1)
@@ -62,9 +82,9 @@
 
 OSDefineMetaClassAndStructors( IOUSBMassStorageClass, IOSCSIProtocolServices )
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ init - Called at initialization time							   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- init - Called at initialization time							   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 bool 
 IOUSBMassStorageClass::init( OSDictionary * propTable )
@@ -78,10 +98,10 @@ IOUSBMassStorageClass::init( OSDictionary * propTable )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ start - Called at services start time	(after successful matching)
+//-----------------------------------------------------------------------------
+//	- start - Called at services start time	(after successful matching)
 //																	   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 bool 
 IOUSBMassStorageClass::start( IOService * provider )
@@ -350,41 +370,73 @@ IOUSBMassStorageClass::start( IOService * provider )
 	{
 		characterDict = OSDictionary::withCapacity ( 1 );
 	}
-	
 	else
 	{
 		characterDict->retain ( );
 	}
-	
-	obj = getProperty ( kIOPropertyPhysicalInterconnectTypeKey );
-	if ( obj != NULL )
-	{
-		characterDict->setObject ( kIOPropertyPhysicalInterconnectTypeKey, obj );
-	}
-	
-	obj = getProperty ( kIOPropertyPhysicalInterconnectLocationKey );
-	if ( obj != NULL )
-	{
-		characterDict->setObject ( kIOPropertyPhysicalInterconnectLocationKey, obj );
-	}
-	
-	obj = getProperty ( kIOPropertyReadTimeOutDurationKey );	
-	if ( obj != NULL );
-	{
-		characterDict->setObject ( kIOPropertyReadTimeOutDurationKey, obj );
-	} 
-	
-	obj = getProperty ( kIOPropertyWriteTimeOutDurationKey );	
-	if ( obj != NULL );
-	{
-		characterDict->setObject ( kIOPropertyWriteTimeOutDurationKey, obj );
-	}
-	
-	setProperty ( kIOPropertyProtocolCharacteristicsKey, characterDict );
-	
-	characterDict->release ( );
+    
+    if ( characterDict != NULL )
+    {
+        
+        obj = getProperty ( kIOPropertyPhysicalInterconnectTypeKey );
+        if ( obj != NULL )
+        {
+            characterDict->setObject ( kIOPropertyPhysicalInterconnectTypeKey, obj );
+        }
+        
+        obj = getProperty ( kIOPropertyPhysicalInterconnectLocationKey );
+        if ( obj != NULL )
+        {
+            characterDict->setObject ( kIOPropertyPhysicalInterconnectLocationKey, obj );
+        }
+            
+        // Check to see if this device is internal or not. The results of this check if successful 
+        // will override location data provided in IOKit personalities. 
+        if ( IsPhysicalInterconnectLocationInternal ( ) )
+        {
+        
+            OSString *      internalString = NULL;
+            
+            
+            // As this shall be a rarity, log it. Internal devices should only be configured at 
+            // boot time so USB Logger isn't an option.
+            if ( USB_MASS_STORAGE_DEBUG == 1 ) 
+            {
+                IOLog ( "%s[%p]: Configuring INTERNAL USB storage device", getName(), this );
+            }
+            
+            internalString = OSString::withCString ( kIOPropertyInternalKey );
+            if ( internalString != NULL )
+            {
+                
+                characterDict->setObject ( kIOPropertyPhysicalInterconnectLocationKey, internalString );
+                internalString->release ( );
+                internalString = NULL;
+                
+            }
+
+        }
+        
+        obj = getProperty ( kIOPropertyReadTimeOutDurationKey );	
+        if ( obj != NULL );
+        {
+            characterDict->setObject ( kIOPropertyReadTimeOutDurationKey, obj );
+        } 
+        
+        obj = getProperty ( kIOPropertyWriteTimeOutDurationKey );	
+        if ( obj != NULL );
+        {
+            characterDict->setObject ( kIOPropertyWriteTimeOutDurationKey, obj );
+        }
+
+        setProperty ( kIOPropertyProtocolCharacteristicsKey, characterDict );
+        characterDict->release ( );
+        characterDict = NULL;
+        
+    }
     
    	STATUS_LOG(( 6, "%s[%p]: successfully configured", getName(), this));
+
 
 #if defined (__i386__) 
 	{
@@ -407,6 +459,9 @@ IOUSBMassStorageClass::start( IOService * provider )
 	}
 #endif
 
+
+
+
 	// Device configured. We're attached.
 	fDeviceAttached = true;
 
@@ -424,18 +479,21 @@ abortStart:
 	{
 		fCBIMemoryDescriptor->complete();
 		fCBIMemoryDescriptor->release();
+        fCBIMemoryDescriptor = NULL;
 	}
 	
 	if ( fBulkOnlyCBWMemoryDescriptor != NULL )
 	{
 		fBulkOnlyCBWMemoryDescriptor->complete();
 		fBulkOnlyCBWMemoryDescriptor->release();
+        fBulkOnlyCBWMemoryDescriptor = NULL;
 	}
 	
 	if ( fBulkOnlyCSWMemoryDescriptor != NULL )
 	{
 		fBulkOnlyCSWMemoryDescriptor->complete();
 		fBulkOnlyCSWMemoryDescriptor->release();
+        fBulkOnlyCSWMemoryDescriptor = NULL;
 	}
 	
 	// Call the stop method to clean up any allocated resources.
@@ -445,9 +503,9 @@ abortStart:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ stop - Called at stop time								   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- stop - Called at stop time								   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 void 
 IOUSBMassStorageClass::stop(IOService * provider)
@@ -469,9 +527,9 @@ IOUSBMassStorageClass::stop(IOService * provider)
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ free - Called by IOKit to free any resources.					   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- free - Called by IOKit to free any resources.					   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::free ( void )
@@ -484,28 +542,29 @@ IOUSBMassStorageClass::free ( void )
 		// to dereference it unless reserved is non-NULL.
 		if ( fClients != NULL )
 		{
-			
 			fClients->release();
 			fClients = NULL;
-			
 		}
 		
 		if ( fCBIMemoryDescriptor != NULL )
 		{
 			fCBIMemoryDescriptor->complete();
 			fCBIMemoryDescriptor->release();
+            fCBIMemoryDescriptor = NULL;
 		}
 		
 		if ( fBulkOnlyCBWMemoryDescriptor != NULL )
 		{
 			fBulkOnlyCBWMemoryDescriptor->complete();
 			fBulkOnlyCBWMemoryDescriptor->release();
+            fBulkOnlyCBWMemoryDescriptor = NULL;
 		}
 		
 		if ( fBulkOnlyCSWMemoryDescriptor != NULL )
 		{
 			fBulkOnlyCSWMemoryDescriptor->complete();
 			fBulkOnlyCSWMemoryDescriptor->release();
+            fBulkOnlyCSWMemoryDescriptor = NULL;
 		}
 		
 		IOFree ( reserved, sizeof ( ExpansionData ) );
@@ -518,9 +577,9 @@ IOUSBMassStorageClass::free ( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ message - Called by IOKit to deliver messages.				   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- message - Called by IOKit to deliver messages.				   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::message( UInt32 type, IOService * provider, void * argument )
@@ -562,9 +621,9 @@ IOUSBMassStorageClass::message( UInt32 type, IOService * provider, void * argume
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ willTerminate                                                    [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- willTerminate                                                    [PUBLIC]
+//-----------------------------------------------------------------------------
 
 bool        
 IOUSBMassStorageClass::willTerminate(  IOService *     provider, 
@@ -592,9 +651,9 @@ IOUSBMassStorageClass::willTerminate(  IOService *     provider,
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ didTerminate                                                     [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- didTerminate                                                     [PUBLIC]
+//-----------------------------------------------------------------------------
 
 bool
 IOUSBMassStorageClass::didTerminate( IOService * provider, IOOptionBits options, bool * defer )
@@ -628,9 +687,9 @@ IOUSBMassStorageClass::didTerminate( IOService * provider, IOOptionBits options,
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BeginProvidedServices											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- BeginProvidedServices											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 bool	
 IOUSBMassStorageClass::BeginProvidedServices( void )
@@ -713,9 +772,6 @@ IOUSBMassStorageClass::BeginProvidedServices( void )
 					else if ( ( status == kIOReturnNotResponding ) && ( triedReset == false ) )
 					{
 						// The device isn't responding. Let us reset the device, and try again.
-						
-						// We need to retain ourselves so we stick around after the bus reset.
-						retain();
 				
 						// The endpoint status could not be retrieved meaning that the device has
 						// stopped responding. Or this could be a device we know needs a reset.
@@ -724,11 +780,8 @@ IOUSBMassStorageClass::BeginProvidedServices( void )
 						STATUS_LOG(( 4, "%s[%p]: BeginProvidedServices: device not responding, reseting.", getName(), this ));
 						
 						// Reset the device on its own thread so we don't deadlock.
-						fResetInProgress = true;
-						
-						IOCreateThread( IOUSBMassStorageClass::sResetDevice, this );
-						fCommandGate->runAction ( ( IOCommandGate::Action ) &IOUSBMassStorageClass::sWaitForReset );
-						
+						ResetDeviceNow ( true );
+
 						triedReset = true;
 					}
 					else
@@ -825,9 +878,9 @@ IOUSBMassStorageClass::BeginProvidedServices( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ EndProvidedServices											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- EndProvidedServices											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 bool	
 IOUSBMassStorageClass::EndProvidedServices( void )
@@ -841,9 +894,9 @@ IOUSBMassStorageClass::EndProvidedServices( void )
 #pragma mark -
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ SendSCSICommand												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- SendSCSICommand												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 bool 
 IOUSBMassStorageClass::SendSCSICommand( 	
@@ -941,9 +994,9 @@ IOUSBMassStorageClass::SendSCSICommand(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ CompleteSCSICommand											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- CompleteSCSICommand											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::CompleteSCSICommand( SCSITaskIdentifier request, IOReturn status )
@@ -963,9 +1016,9 @@ IOUSBMassStorageClass::CompleteSCSICommand( SCSITaskIdentifier request, IOReturn
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ AbortSCSICommand												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- AbortSCSICommand												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 SCSIServiceResponse
 IOUSBMassStorageClass::AbortSCSICommand( SCSITaskIdentifier abortTask )
@@ -1004,9 +1057,9 @@ IOUSBMassStorageClass::AbortSCSICommand( SCSITaskIdentifier abortTask )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ IsProtocolServiceSupported									[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- IsProtocolServiceSupported									[PROTECTED]
+//-----------------------------------------------------------------------------
 
 bool
 IOUSBMassStorageClass::IsProtocolServiceSupported( 
@@ -1123,9 +1176,9 @@ Exit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ HandleProtocolServiceFeature									[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- HandleProtocolServiceFeature									[PROTECTED]
+//-----------------------------------------------------------------------------
 
 bool
 IOUSBMassStorageClass::HandleProtocolServiceFeature( 
@@ -1144,11 +1197,11 @@ IOUSBMassStorageClass::HandleProtocolServiceFeature(
 #pragma mark -
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ ClearFeatureEndpointStall -	Method to do the CLEAR_FEATURE command for
+//-----------------------------------------------------------------------------
+//	- ClearFeatureEndpointStall -	Method to do the CLEAR_FEATURE command for
 //									an ENDPOINT_STALL feature.		
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn 
 IOUSBMassStorageClass::ClearFeatureEndpointStall( 
@@ -1190,11 +1243,11 @@ IOUSBMassStorageClass::ClearFeatureEndpointStall(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetStatusEndpointStatus -	Method to do the GET_STATUS command for the
+//-----------------------------------------------------------------------------
+//	- GetStatusEndpointStatus -	Method to do the GET_STATUS command for the
 //								endpoint that the IOUSBPipe is connected to.		
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn 
 IOUSBMassStorageClass::GetStatusEndpointStatus( 
@@ -1243,11 +1296,11 @@ IOUSBMassStorageClass::GetStatusEndpointStatus(
 /* The following methods are for use only by this class */
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetInterfaceReference -	Method to do the GET_STATUS command for the
+//-----------------------------------------------------------------------------
+//	- GetInterfaceReference -	Method to do the GET_STATUS command for the
 //								endpoint that the IOUSBPipe is connected to.		
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOUSBInterface *
 IOUSBMassStorageClass::GetInterfaceReference( void )
@@ -1263,9 +1316,9 @@ IOUSBMassStorageClass::GetInterfaceReference( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ SetInterfaceReference											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- SetInterfaceReference											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::SetInterfaceReference( IOUSBInterface * newInterface )
@@ -1274,9 +1327,9 @@ IOUSBMassStorageClass::SetInterfaceReference( IOUSBInterface * newInterface )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetInterfaceSubClass											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetInterfaceSubClass											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 UInt8
 IOUSBMassStorageClass::GetInterfaceSubclass( void )
@@ -1285,9 +1338,9 @@ IOUSBMassStorageClass::GetInterfaceSubclass( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetInterfaceProtocol											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetInterfaceProtocol											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 UInt8
 IOUSBMassStorageClass::GetInterfaceProtocol( void )
@@ -1296,9 +1349,9 @@ IOUSBMassStorageClass::GetInterfaceProtocol( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetControlPipe												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetControlPipe												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOUSBPipe *
 IOUSBMassStorageClass::GetControlPipe( void )
@@ -1312,9 +1365,9 @@ IOUSBMassStorageClass::GetControlPipe( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetBulkInPipe													[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetBulkInPipe													[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOUSBPipe *
 IOUSBMassStorageClass::GetBulkInPipe( void )
@@ -1323,9 +1376,9 @@ IOUSBMassStorageClass::GetBulkInPipe( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetBulkOutPipe												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetBulkOutPipe												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOUSBPipe *
 IOUSBMassStorageClass::GetBulkOutPipe( void )
@@ -1334,9 +1387,9 @@ IOUSBMassStorageClass::GetBulkOutPipe( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetInterruptPipe												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetInterruptPipe												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOUSBPipe *
 IOUSBMassStorageClass::GetInterruptPipe( void )
@@ -1345,9 +1398,9 @@ IOUSBMassStorageClass::GetInterruptPipe( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetMaxLogicalUnitNumber										[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetMaxLogicalUnitNumber										[PROTECTED]
+//-----------------------------------------------------------------------------
 
 UInt8
 IOUSBMassStorageClass::GetMaxLogicalUnitNumber( void ) const
@@ -1356,9 +1409,9 @@ IOUSBMassStorageClass::GetMaxLogicalUnitNumber( void ) const
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ SetMaxLogicalUnitNumber										[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- SetMaxLogicalUnitNumber										[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::SetMaxLogicalUnitNumber( UInt8 maxLUN )
@@ -1372,9 +1425,9 @@ IOUSBMassStorageClass::SetMaxLogicalUnitNumber( UInt8 maxLUN )
 #pragma mark -
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetCBIRequestBlock											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetCBIRequestBlock											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 CBIRequestBlock *	
 IOUSBMassStorageClass::GetCBIRequestBlock( void )
@@ -1384,9 +1437,9 @@ IOUSBMassStorageClass::GetCBIRequestBlock( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ ReleaseCBIRequestBlock										[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- ReleaseCBIRequestBlock										[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void	
 IOUSBMassStorageClass::ReleaseCBIRequestBlock( CBIRequestBlock * cbiRequestBlock )
@@ -1404,9 +1457,9 @@ IOUSBMassStorageClass::ReleaseCBIRequestBlock( CBIRequestBlock * cbiRequestBlock
 #pragma mark -
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetBulkOnlyRequestBlock										[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetBulkOnlyRequestBlock										[PROTECTED]
+//-----------------------------------------------------------------------------
 
 BulkOnlyRequestBlock *	
 IOUSBMassStorageClass::GetBulkOnlyRequestBlock( void )
@@ -1416,9 +1469,9 @@ IOUSBMassStorageClass::GetBulkOnlyRequestBlock( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ ReleaseBulkOnlyRequestBlock									[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- ReleaseBulkOnlyRequestBlock									[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void	
 IOUSBMassStorageClass::ReleaseBulkOnlyRequestBlock( BulkOnlyRequestBlock * boRequestBlock )
@@ -1432,9 +1485,9 @@ IOUSBMassStorageClass::ReleaseBulkOnlyRequestBlock( BulkOnlyRequestBlock * boReq
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GetNextBulkOnlyCommandTag										[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GetNextBulkOnlyCommandTag										[PROTECTED]
+//-----------------------------------------------------------------------------
 
 UInt32	
 IOUSBMassStorageClass::GetNextBulkOnlyCommandTag( void )
@@ -1445,9 +1498,9 @@ IOUSBMassStorageClass::GetNextBulkOnlyCommandTag( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ HandlePowerOn - Will get called when a device has been resumed   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- HandlePowerOn - Will get called when a device has been resumed   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::HandlePowerOn( void )
@@ -1485,9 +1538,9 @@ IOUSBMassStorageClass::HandlePowerOn( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ handleOpen													   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- handleOpen													   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 bool
 IOUSBMassStorageClass::handleOpen( IOService *		client,
@@ -1521,9 +1574,9 @@ ErrorExit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ handleClose													   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- handleClose													   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::handleClose( IOService *		client,
@@ -1557,9 +1610,9 @@ Exit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ handleIsOpen													   [PUBLIC]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- handleIsOpen													   [PUBLIC]
+//-----------------------------------------------------------------------------
 
 bool
 IOUSBMassStorageClass::handleIsOpen( const IOService * client ) const
@@ -1595,9 +1648,9 @@ CallSuperClass:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ sWaitForReset											[STATIC][PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- sWaitForReset											[STATIC][PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::sWaitForReset( void * refcon )
@@ -1608,9 +1661,9 @@ IOUSBMassStorageClass::sWaitForReset( void * refcon )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GatedWaitForReset												[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- GatedWaitForReset												[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::GatedWaitForReset( void )
@@ -1628,9 +1681,9 @@ IOUSBMassStorageClass::GatedWaitForReset( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ sWaitForTaskAbort										[STATIC][PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- sWaitForTaskAbort										[STATIC][PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::sWaitForTaskAbort( void * refcon )
@@ -1641,9 +1694,9 @@ IOUSBMassStorageClass::sWaitForTaskAbort( void * refcon )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ GatedWaitForTaskAbort											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ--
+//-----------------------------------------------------------------------------
+//	- GatedWaitForTaskAbort											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::GatedWaitForTaskAbort( void )
@@ -1661,9 +1714,9 @@ IOUSBMassStorageClass::GatedWaitForTaskAbort( void )
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ sResetDevice											[STATIC][PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- sResetDevice											[STATIC][PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::sResetDevice( void * refcon )
@@ -1716,13 +1769,7 @@ IOUSBMassStorageClass::sResetDevice( void * refcon )
 		{
 		
 			// Yes, so we need to abort the command we'll not be able to retry. 
-			// We set the device state to detached so the proper status for the 
-			// device is returned along with the aborted SCSITask.
 			driver->fWaitingForReconfigurationMessage = false;
-			driver->fDeviceAttached = false;
-			
-            // Let the clients know that the device is gone.
-            driver->SendNotification_DeviceRemoved( );
         
 		}
 		
@@ -1735,9 +1782,11 @@ IOUSBMassStorageClass::sResetDevice( void * refcon )
 	if ( ( driver->fTerminating == true ) ||
 		 ( driver->isInactive( ) == true ) )
 	{
+    
 		STATUS_LOG(( 2, "%s[%p]: sResetDevice - We are being terminated (ii) !", driver->getName(), driver ));
 
 		goto ErrorExit;
+        
 	}
 
 	// Once the device has been reset, send notification to the client so that the
@@ -1749,7 +1798,15 @@ ErrorExit:
 	
 	if ( status != kIOReturnSuccess )
 	{
+    
+        // We set the device state to detached so the proper status for the 
+        // device is returned along with the aborted SCSITask.
+        driver->fDeviceAttached = false;
 		driver->AbortCurrentSCSITask();
+        
+        // Let the clients know that the device is gone.
+        driver->SendNotification_DeviceRemoved( );
+        
 	}
     
     if ( ( driver->fTerminating == true ) && ( driver->GetInterfaceReference() != NULL ) ) 
@@ -1787,9 +1844,9 @@ ErrorExit:
 	
 }
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ sAbortCurrentSCSITask									[STATIC][PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- sAbortCurrentSCSITask									[STATIC][PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::sAbortCurrentSCSITask( void * refcon )
@@ -1841,11 +1898,11 @@ IOUSBMassStorageClass::sAbortCurrentSCSITask( void * refcon )
 OSMetaClassDefineReservedUsed( IOUSBMassStorageClass, 1 );
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ StartDeviceRecovery - The recovery sequence to restore functionality for
+//-----------------------------------------------------------------------------
+//	- StartDeviceRecovery - The recovery sequence to restore functionality for
 //							devices that stop responding (like many devices
 //							after a Suspend/Resume).				[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn
 IOUSBMassStorageClass::StartDeviceRecovery( void )
@@ -1880,9 +1937,9 @@ IOUSBMassStorageClass::StartDeviceRecovery( void )
 OSMetaClassDefineReservedUsed( IOUSBMassStorageClass, 2 );
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ FinishDeviceRecovery											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- FinishDeviceRecovery											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::FinishDeviceRecovery( IOReturn status )
@@ -1906,6 +1963,8 @@ IOUSBMassStorageClass::FinishDeviceRecovery( IOReturn status )
     {
         
         // We're being terminated. Abort the outstanding command so the system can clean up.
+		fDeviceAttached = false;
+		
         goto ErrorExit;
         
     }
@@ -1918,7 +1977,6 @@ IOUSBMassStorageClass::FinishDeviceRecovery( IOReturn status )
 		
 		STATUS_LOG(( 4, "%s[%p]: FinishDeviceRecovery reseting device on separate thread.", getName(), this ));
 		
-		fWaitingForReconfigurationMessage = true;
 		ResetDeviceNow( false );
 
 	}
@@ -1980,9 +2038,9 @@ ErrorExit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ DeviceRecoveryCompletionAction								[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- DeviceRecoveryCompletionAction								[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void 
 IOUSBMassStorageClass::DeviceRecoveryCompletionAction(
@@ -2001,9 +2059,9 @@ IOUSBMassStorageClass::DeviceRecoveryCompletionAction(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ ResetDeviceNow                                                [PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- ResetDeviceNow                                                [PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::ResetDeviceNow( bool waitForReset )
@@ -2026,7 +2084,15 @@ IOUSBMassStorageClass::ResetDeviceNow( bool waitForReset )
 		
 		// Reset the device on its own thread so we don't deadlock.
 		fResetInProgress = true;
-		
+        fWaitingForReconfigurationMessage = false;
+        
+        // If we aren't going to block on the reset thread, we need to wait for the 
+        // reconfiguration message. 
+        if ( waitForReset == false ) 
+        {
+            fWaitingForReconfigurationMessage = true;
+        }
+        
 		IOCreateThread( IOUSBMassStorageClass::sResetDevice, this );
 		
 		if ( waitForReset == true )
@@ -2041,9 +2107,9 @@ IOUSBMassStorageClass::ResetDeviceNow( bool waitForReset )
     
 }
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ AbortCurrentSCSITask                                          [PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- AbortCurrentSCSITask                                          [PROTECTED]
+//-----------------------------------------------------------------------------
 
 void
 IOUSBMassStorageClass::AbortCurrentSCSITask( void )
@@ -2072,6 +2138,47 @@ Exit:
 	release();
 	
 	STATUS_LOG(( 4, "%s[%p]: AbortCurrentSCSITask Exiting", getName(), this ));
+	
+}
+
+
+//-----------------------------------------------------------------------------
+//	- IsPhysicalInterconnectLocationInternal                        [PROTECTED]
+//-----------------------------------------------------------------------------
+
+bool				
+IOUSBMassStorageClass::IsPhysicalInterconnectLocationInternal ( void )
+{
+
+	IOReturn				status				= kIOReturnError;
+	IOUSBInterface *		usbInterface		= NULL;
+	IOUSBDevice *			usbDevice			= NULL;
+	UInt32					deviceInformation	= 0;
+	bool                    internal            = false;
+    
+	
+	// We acquire our references individually to avoid panics. 
+	
+	// Get a reference to our USB interface.
+	usbInterface = GetInterfaceReference();
+	require ( ( usbInterface != NULL ), ErrorExit );
+	
+	// Get a reference to our USB device. 
+	usbDevice = usbInterface->GetDevice();
+	require ( ( usbDevice != NULL ), ErrorExit );
+	
+	status = usbDevice->GetDeviceInformation ( &deviceInformation );
+	require_success ( status, ErrorExit );
+	
+	if ( deviceInformation & ( 1 << kUSBDeviceInfoIsInternalMask ) )
+	{
+		internal = true;
+	}	
+	
+	
+ErrorExit:
+
+	return status;
 	
 }
 

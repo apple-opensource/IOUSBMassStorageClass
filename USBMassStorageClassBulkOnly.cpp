@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2007 Apple Inc. All rights reserved.
+ * Copyright (c) 1998-2008 Apple Inc. All rights reserved.
  *
  * @APPLE_LICENSE_HEADER_START@
  * 
@@ -22,17 +22,17 @@
  */
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 //	Includes
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 // This class' header file
 #include "IOUSBMassStorageClass.h"
 #include "Debugging.h"
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 //	Macros
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 // Macros for printing debugging information
 #if (USB_MASS_STORAGE_DEBUG == 1)
@@ -68,11 +68,11 @@ enum
 #pragma mark Protocol Services Methods
 #pragma mark -
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ AbortSCSICommandForBulkOnlyProtocol - The AbortSCSICommand helper method
+//-----------------------------------------------------------------------------
+//	- AbortSCSICommandForBulkOnlyProtocol - The AbortSCSICommand helper method
 //											for Bulk Only protocol devices.
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn IOUSBMassStorageClass::AbortSCSICommandForBulkOnlyProtocol(
                                         SCSITaskIdentifier request )
@@ -83,11 +83,11 @@ IOReturn IOUSBMassStorageClass::AbortSCSICommandForBulkOnlyProtocol(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ SendSCSICommandForBulkOnlyProtocol - 	The SendSCSICommand helper method
+//-----------------------------------------------------------------------------
+//	- SendSCSICommandForBulkOnlyProtocol - 	The SendSCSICommand helper method
 //											for Bulk Only protocol devices.
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn IOUSBMassStorageClass::SendSCSICommandForBulkOnlyProtocol(
                                          SCSITaskIdentifier request )
@@ -124,9 +124,9 @@ IOReturn IOUSBMassStorageClass::SendSCSICommandForBulkOnlyProtocol(
 #pragma mark Bulk Only Protocol Specific Commands
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkDeviceResetDevice											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- BulkDeviceResetDevice											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn 
 IOUSBMassStorageClass::BulkDeviceResetDevice(
@@ -168,9 +168,9 @@ IOUSBMassStorageClass::BulkDeviceResetDevice(
 #pragma mark SendSCSICommand Helper methods
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkOnlyUSBCompletionAction									[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- BulkOnlyUSBCompletionAction									[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void 
 IOUSBMassStorageClass::BulkOnlyUSBCompletionAction(
@@ -190,11 +190,11 @@ IOUSBMassStorageClass::BulkOnlyUSBCompletionAction(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkOnlySendCBWPacket -	Prepare the Command Block Wrapper packet for
+//-----------------------------------------------------------------------------
+//	- BulkOnlySendCBWPacket -	Prepare the Command Block Wrapper packet for
 //								Bulk Only Protocol
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 IOReturn 
 IOUSBMassStorageClass::BulkOnlySendCBWPacket(
@@ -266,9 +266,9 @@ Exit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkOnlyTransferData											[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- BulkOnlyTransferData											[PROTECTED]
+//-----------------------------------------------------------------------------
 
 IOReturn 
 IOUSBMassStorageClass::BulkOnlyTransferData( 
@@ -306,11 +306,11 @@ IOUSBMassStorageClass::BulkOnlyTransferData(
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkOnlyReceiveCSWPacket -	Prepare the Command Status Wrapper packet
+//-----------------------------------------------------------------------------
+//	- BulkOnlyReceiveCSWPacket -	Prepare the Command Status Wrapper packet
 //									for Bulk Only Protocol
 //																	[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
 
 // 
 IOReturn 
@@ -342,9 +342,9 @@ Exit:
 }
 
 
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
-//	¥ BulkOnlyExecuteCommandCompletion								[PROTECTED]
-//ÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑÑ
+//-----------------------------------------------------------------------------
+//	- BulkOnlyExecuteCommandCompletion								[PROTECTED]
+//-----------------------------------------------------------------------------
 
 void 
 IOUSBMassStorageClass::BulkOnlyExecuteCommandCompletion(
@@ -437,10 +437,11 @@ IOUSBMassStorageClass::BulkOnlyExecuteCommandCompletion(
 			}
 			
 			// If there is to be no data transfer then we are done and can return to the caller.
-			if ( GetDataTransferDirection( boRequestBlock->request ) == kSCSIDataTransfer_NoDataTransfer )
+			if ( ( GetDataTransferDirection( boRequestBlock->request ) == kSCSIDataTransfer_NoDataTransfer ) || 
+                 ( GetRequestedDataTransferCount( boRequestBlock->request ) == 0 ) )
 			{
 				
-				// Bulk transfer is done, get the Command Status Wrapper from the device.
+				// No data to transfer, get the Command Status Wrapper from the device.
 				status = BulkOnlyReceiveCSWPacket( boRequestBlock, kBulkOnlyStatusReceived );
 				if ( status == kIOReturnSuccess )
 				{
@@ -713,7 +714,27 @@ IOUSBMassStorageClass::BulkOnlyExecuteCommandCompletion(
 				// An error occurred trying to get the first CSW, we should check and clear the stall,
 				// and then try the CSW again
 				status = BulkOnlyReceiveCSWPacket( boRequestBlock, kBulkOnlyStatusReceived2ndTime );
-				if ( status == kIOReturnSuccess )
+				if ( status != kIOReturnSuccess )
+				{
+                
+                    // The device is so far gone that we couldn't even retry the CSW. Reset time.
+                    if ( fUseUSBResetNotBOReset )
+                    {
+                    
+                        // By passing this to Finish device recovery we ensure that the driver is still active,
+                        // and that the device is still connected to the Mac.
+                        FinishDeviceRecovery ( kIOReturnError );
+                        status = kIOReturnSuccess;
+                        
+                    }
+                    else
+                    {
+                        status = BulkDeviceResetDevice( boRequestBlock, kBulkOnlyResetCompleted );
+                    }
+                
+                }
+				
+                if ( status == kIOReturnSuccess )
 				{
 					commandInProgress = true;
 				}
